@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------------
 --                                                                          --
---                 Copyright (C) 2015-2016, AdaCore                         --
+--                 Copyright (C) 2015-2020, AdaCore                         --
 --                                                                          --
 --  Redistribution and use in source and binary forms, with or without      --
 --  modification, are permitted provided that the following conditions are  --
@@ -43,17 +43,18 @@
 --  This file provides declarations for devices on the STM32F4 Discovery kits
 --  manufactured by ST Microelectronics.
 
-with STM32.Device;  use STM32.Device;
+with STM32.Device;   use STM32.Device;
 
-with STM32.GPIO;    use STM32.GPIO;
-with STM32.I2C;     use STM32.I2C;
-with STM32.SPI;     use STM32.SPI;
-with STM32.Timers;  use STM32.Timers;
-with STM32.USARTs;  use STM32.USARTs;
+with STM32.GPIO;     use STM32.GPIO;
+with STM32.I2C;      use STM32.I2C;
+with STM32.SPI;      use STM32.SPI;
+with STM32.Timers;   use STM32.Timers;
+with STM32.USARTs;   use STM32.USARTs;
 
-with MPU9250;       use MPU9250;
-with AK8963;        use AK8963;
+with MPU9250;        use MPU9250;
+with AK8963;         use AK8963;
 
+with Ravenscar_Time;
 package STM32.Board is
    pragma Elaborate_Body;
 
@@ -94,16 +95,16 @@ package STM32.Board is
    MOTOR_123_Timer : Timer renames Timer_2;
    MOTOR_4_Timer   : Timer renames Timer_4;
    MOTOR_1         : GPIO_Point renames PA1;
-   MOTOR_1_AF      : GPIO_Alternate_Function renames GPIO_AF_1_TIM2;
+   MOTOR_1_AF      : GPIO_Alternate_Function renames GPIO_AF_TIM2_1;
    MOTOR_1_Channel : Timer_Channel renames Channel_2;
    MOTOR_2         : GPIO_Point renames PB11;
-   MOTOR_2_AF      : GPIO_Alternate_Function renames GPIO_AF_1_TIM2;
+   MOTOR_2_AF      : GPIO_Alternate_Function renames GPIO_AF_TIM2_1;
    MOTOR_2_Channel : Timer_Channel renames Channel_4;
    MOTOR_3         : GPIO_Point renames PA15;
-   MOTOR_3_AF      : GPIO_Alternate_Function renames GPIO_AF_1_TIM2;
+   MOTOR_3_AF      : GPIO_Alternate_Function renames GPIO_AF_TIM2_1;
    MOTOR_3_Channel : Timer_Channel renames Channel_1;
    MOTOR_4         : GPIO_Point renames PB9;
-   MOTOR_4_AF      : GPIO_Alternate_Function renames GPIO_AF_2_TIM4;
+   MOTOR_4_AF      : GPIO_Alternate_Function renames GPIO_AF_TIM4_2;
    MOTOR_4_Channel : Timer_Channel renames Channel_4;
 
    ---------
@@ -130,6 +131,8 @@ package STM32.Board is
    -- SPI --
    ---------
 
+   procedure Initialize_EXT_SPI;
+
    EXT_SPI  : SPI_Port renames SPI_1;
    EXT_SCK  : GPIO_Point renames PA5;
    EXT_MISO : GPIO_Point renames PA6;
@@ -138,6 +141,10 @@ package STM32.Board is
    EXT_CS1  : GPIO_Point renames PB4;
    EXT_CS2  : GPIO_Point renames PB5;
    EXT_CS3  : GPIO_Point renames PB8;
+
+   procedure Configure_EXT_CS (Pin : in out GPIO_Point)
+   with Pre =>
+     Pin = EXT_CS0 or Pin = EXT_CS1 or Pin = EXT_CS2 or Pin = EXT_CS3;
 
    ---------
    -- USB --
@@ -152,11 +159,11 @@ package STM32.Board is
    --------------------------
 
    EXT_USART1    : USART renames USART_3;
-   EXT_USART1_AF : GPIO_Alternate_Function renames GPIO_AF_7_USART3;
+   EXT_USART1_AF : GPIO_Alternate_Function renames GPIO_AF_USART3_7;
    EXT_USART1_TX : GPIO_Point renames PC10;
    EXT_USART1_RX : GPIO_Point renames PC11;
    EXT_USART2    : USART renames USART_2;
-   EXT_USART2_AF : GPIO_Alternate_Function renames GPIO_AF_7_USART2;
+   EXT_USART2_AF : GPIO_Alternate_Function renames GPIO_AF_USART2_7;
    EXT_USART2_TX : GPIO_Point renames PA2;
    EXT_USART2_RX : GPIO_Point renames PA3;
 
@@ -165,7 +172,7 @@ package STM32.Board is
    -----------
 
    NRF_USART     : USART renames USART_6;
-   NRF_USART_AF  : GPIO_Alternate_Function renames GPIO_AF_8_USART6;
+   NRF_USART_AF  : GPIO_Alternate_Function renames GPIO_AF_USART6_8;
    NRF_RX        : GPIO_Point renames PC6;
    NRF_TX        : GPIO_Point renames PC7;
    NRF_SWCLK     : GPIO_Point renames PB13;
@@ -176,10 +183,14 @@ package STM32.Board is
    -- MPU --
    ---------
 
-   MPU_Device   : MPU9250.MPU9250_Device (I2C_MPU_Port'Access, High);
+   MPU_Device   : MPU9250.MPU9250_Device (I2C_MPU_Port'Access,
+                                          High,
+                                          Ravenscar_Time.Delays);
    MPU_INT      : GPIO_Point renames PC13;
    MPU_FSYNC    : GPIO_Point renames PC14;
 
-   MAG_Device   : AK8963_Device (I2C_MPU_Port'Access, Add_00);
+   MAG_Device   : AK8963_Device (I2C_MPU_Port'Access,
+                                 Add_00,
+                                 Ravenscar_Time.Delays);
 
 end STM32.Board;

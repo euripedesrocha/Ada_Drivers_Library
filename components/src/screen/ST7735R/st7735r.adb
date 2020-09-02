@@ -1,7 +1,35 @@
-with Ada.Real_Time; use Ada.Real_Time;
+------------------------------------------------------------------------------
+--                                                                          --
+--                     Copyright (C) 2015-2016, AdaCore                     --
+--                                                                          --
+--  Redistribution and use in source and binary forms, with or without      --
+--  modification, are permitted provided that the following conditions are  --
+--  met:                                                                    --
+--     1. Redistributions of source code must retain the above copyright    --
+--        notice, this list of conditions and the following disclaimer.     --
+--     2. Redistributions in binary form must reproduce the above copyright --
+--        notice, this list of conditions and the following disclaimer in   --
+--        the documentation and/or other materials provided with the        --
+--        distribution.                                                     --
+--     3. Neither the name of the copyright holder nor the names of its     --
+--        contributors may be used to endorse or promote products derived   --
+--        from this software without specific prior written permission.     --
+--                                                                          --
+--   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS    --
+--   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT      --
+--   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR  --
+--   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT   --
+--   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, --
+--   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT       --
+--   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,  --
+--   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY  --
+--   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT    --
+--   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE  --
+--   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   --
+--                                                                          --
+------------------------------------------------------------------------------
+
 with Ada.Unchecked_Conversion;
-with System;
-with Interfaces; use Interfaces;
 
 package body ST7735R is
 
@@ -30,32 +58,36 @@ package body ST7735R is
       MY        at 0 range 7 .. 7;
    end record;
 
-   function To_Byte is new Ada.Unchecked_Conversion (MADCTL, Byte);
+   function To_UInt8 is new Ada.Unchecked_Conversion (MADCTL, UInt8);
 
-   procedure Write_Command (LCD : ST7735R_Device;
-                            Cmd : Byte);
-   procedure Write_Command (LCD  : ST7735R_Device;
-                            Cmd  : Byte;
-                            Data : HAL.Byte_Array);
+   procedure Write_Command (LCD : ST7735R_Screen'Class;
+                            Cmd : UInt8);
+   procedure Write_Command (LCD  : ST7735R_Screen'Class;
+                            Cmd  : UInt8;
+                            Data : HAL.UInt8_Array);
 
-   procedure Write_Data (LCD : ST7735R_Device;
-                         Data : Byte);
-   pragma Unreferenced (Write_Data);
-   procedure Write_Data (LCD  : ST7735R_Device;
-                         Data : HAL.Byte_Array);
-   procedure Write_Data (LCD  : ST7735R_Device;
-                         Data : HAL.Short_Array);
+   procedure Write_Pix_Repeat (LCD   : ST7735R_Screen'Class;
+                               Data  : UInt16;
+                               Count : Natural);
+   --  Send the same pixel data Count times. This is used to fill an area with
+   --  the same color without allocating a buffer.
 
-   procedure Set_Command_Mode (LCD : ST7735R_Device);
-   procedure Set_Data_Mode (LCD : ST7735R_Device);
-   procedure Start_Transaction (LCD : ST7735R_Device);
-   procedure End_Transaction (LCD : ST7735R_Device);
+   procedure Write_Data (LCD  : ST7735R_Screen'Class;
+                         Data : HAL.UInt8_Array);
+
+   procedure Read_Data (LCD  : ST7735R_Screen'Class;
+                        Data : out UInt16);
+
+   procedure Set_Command_Mode (LCD : ST7735R_Screen'Class);
+   procedure Set_Data_Mode (LCD : ST7735R_Screen'Class);
+   procedure Start_Transaction (LCD : ST7735R_Screen'Class);
+   procedure End_Transaction (LCD : ST7735R_Screen'Class);
 
    ----------------------
    -- Set_Command_Mode --
    ----------------------
 
-   procedure Set_Command_Mode (LCD : ST7735R_Device) is
+   procedure Set_Command_Mode (LCD : ST7735R_Screen'Class) is
    begin
       LCD.RS.Clear;
    end Set_Command_Mode;
@@ -64,7 +96,7 @@ package body ST7735R is
    -- Set_Data_Mode --
    -------------------
 
-   procedure Set_Data_Mode (LCD : ST7735R_Device) is
+   procedure Set_Data_Mode (LCD : ST7735R_Screen'Class) is
    begin
       LCD.RS.Set;
    end Set_Data_Mode;
@@ -73,7 +105,7 @@ package body ST7735R is
    -- Start_Transaction --
    -----------------------
 
-   procedure Start_Transaction (LCD : ST7735R_Device) is
+   procedure Start_Transaction (LCD : ST7735R_Screen'Class) is
    begin
       LCD.CS.Clear;
    end Start_Transaction;
@@ -82,7 +114,7 @@ package body ST7735R is
    -- End_Transaction --
    ---------------------
 
-   procedure End_Transaction (LCD : ST7735R_Device) is
+   procedure End_Transaction (LCD : ST7735R_Screen'Class) is
    begin
       LCD.CS.Set;
    end End_Transaction;
@@ -91,8 +123,8 @@ package body ST7735R is
    -- Write_Command --
    -------------------
 
-   procedure Write_Command (LCD : ST7735R_Device;
-                            Cmd : Byte)
+   procedure Write_Command (LCD : ST7735R_Screen'Class;
+                            Cmd : UInt8)
    is
       Status : SPI_Status;
    begin
@@ -111,9 +143,9 @@ package body ST7735R is
    -- Write_Command --
    -------------------
 
-   procedure Write_Command (LCD  : ST7735R_Device;
-                            Cmd  : Byte;
-                            Data : HAL.Byte_Array)
+   procedure Write_Command (LCD  : ST7735R_Screen'Class;
+                            Cmd  : UInt8;
+                            Data : HAL.UInt8_Array)
    is
    begin
       Write_Command (LCD, Cmd);
@@ -124,86 +156,90 @@ package body ST7735R is
    -- Write_Data --
    ----------------
 
-   procedure Write_Data (LCD : ST7735R_Device;
-                         Data : Byte)
+   procedure Write_Data (LCD  : ST7735R_Screen'Class;
+                         Data : HAL.UInt8_Array)
    is
       Status : SPI_Status;
    begin
       Start_Transaction (LCD);
       Set_Data_Mode (LCD);
-      LCD.Port.Transmit (SPI_Data_8b'(1 => Data),
-                         Status);
-      End_Transaction (LCD);
+      LCD.Port.Transmit (SPI_Data_8b (Data), Status);
       if Status /= Ok then
          --  No error handling...
          raise Program_Error;
       end if;
+      End_Transaction (LCD);
    end Write_Data;
 
-   ----------------
-   -- Write_Data --
-   ----------------
+   ----------------------
+   -- Write_Pix_Repeat --
+   ----------------------
 
-   procedure Write_Data (LCD  : ST7735R_Device;
-                         Data : HAL.Byte_Array)
+   procedure Write_Pix_Repeat (LCD   : ST7735R_Screen'Class;
+                               Data  : UInt16;
+                               Count : Natural)
    is
       Status : SPI_Status;
+      Data8  : constant SPI_Data_8b :=
+        SPI_Data_8b'(1 => UInt8 (Shift_Right (Data, 8) and 16#FF#),
+                     2 => UInt8 (Data and 16#FF#));
    begin
+      Write_Command (LCD, 16#2C#);
       Start_Transaction (LCD);
       Set_Data_Mode (LCD);
-      for Elt of Data loop
-         LCD.Port.Transmit (SPI_Data_8b'(1 => Elt),
-                            Status);
+      for X in 1 .. Count loop
+         LCD.Port.Transmit (Data8, Status);
          if Status /= Ok then
             --  No error handling...
             raise Program_Error;
          end if;
       end loop;
+
       End_Transaction (LCD);
-   end Write_Data;
+   end Write_Pix_Repeat;
 
-   ----------------
-   -- Write_Data --
-   ----------------
+   ---------------
+   -- Read_Data --
+   ---------------
 
-   procedure Write_Data (LCD  : ST7735R_Device;
-                         Data : HAL.Short_Array)
+   procedure Read_Data (LCD  : ST7735R_Screen'Class;
+                        Data : out UInt16)
    is
-      B1, B2 : Byte;
+      SPI_Data : SPI_Data_16b (1 .. 1);
       Status : SPI_Status;
    begin
       Start_Transaction (LCD);
       Set_Data_Mode (LCD);
-      for Elt of Data loop
-         B1 := Byte (Interfaces.Shift_Right (Elt, 8));
-         B2 := Byte (Elt and 16#FF#);
-         LCD.Port.Transmit (SPI_Data_8b'(B1, B2),
-                            Status);
-         if Status /= Ok then
-            --  No error handling...
-            raise Program_Error;
-         end if;
-      end loop;
+      LCD.Port.Receive (SPI_Data, Status);
+      if Status /= Ok then
+         --  No error handling...
+         raise Program_Error;
+      end if;
       End_Transaction (LCD);
-   end Write_Data;
+
+      Data := SPI_Data (SPI_Data'First);
+
+   end Read_Data;
 
    ----------------
    -- Initialize --
    ----------------
 
-   procedure Initialize (LCD : in out ST7735R_Device) is
+   procedure Initialize (LCD : in out ST7735R_Screen) is
    begin
-      LCD.Initialized := True;
+      LCD.Layer.LCD := LCD'Unchecked_Access;
 
       LCD.RST.Clear;
-      delay until Clock + Milliseconds (100);
+      LCD.Time.Delay_Milliseconds (100);
       LCD.RST.Set;
-      delay until Clock + Milliseconds (100);
+      LCD.Time.Delay_Milliseconds (100);
 
       --  Sleep Exit
       Write_Command (LCD, 16#11#);
 
-      delay until Clock + Milliseconds (100);
+      LCD.Time.Delay_Milliseconds (100);
+
+      LCD.Initialized := True;
    end Initialize;
 
    -----------------
@@ -211,14 +247,14 @@ package body ST7735R is
    -----------------
 
    overriding
-   function Initialized (LCD : ST7735R_Device) return Boolean is
+   function Initialized (LCD : ST7735R_Screen) return Boolean is
      (LCD.Initialized);
 
    -------------
    -- Turn_On --
    -------------
 
-   procedure Turn_On (LCD : ST7735R_Device) is
+   procedure Turn_On (LCD : ST7735R_Screen) is
    begin
       Write_Command (LCD, 16#29#);
    end Turn_On;
@@ -227,7 +263,7 @@ package body ST7735R is
    -- Turn_Off --
    --------------
 
-   procedure Turn_Off (LCD : ST7735R_Device) is
+   procedure Turn_Off (LCD : ST7735R_Screen) is
    begin
       Write_Command (LCD, 16#28#);
    end Turn_Off;
@@ -237,7 +273,7 @@ package body ST7735R is
    -- Display_Inversion_On --
    --------------------------
 
-   procedure Display_Inversion_On (LCD : ST7735R_Device) is
+   procedure Display_Inversion_On (LCD : ST7735R_Screen) is
    begin
       Write_Command (LCD, 16#21#);
    end Display_Inversion_On;
@@ -247,7 +283,7 @@ package body ST7735R is
    -- Display_Inversion_Off --
    ---------------------------
 
-   procedure Display_Inversion_Off (LCD : ST7735R_Device) is
+   procedure Display_Inversion_Off (LCD : ST7735R_Screen) is
    begin
       Write_Command (LCD, 16#20#);
    end Display_Inversion_Off;
@@ -256,17 +292,17 @@ package body ST7735R is
    -- Gamma_Set --
    ---------------
 
-   procedure Gamma_Set (LCD : ST7735R_Device; Gamma_Curve : UInt4) is
+   procedure Gamma_Set (LCD : ST7735R_Screen; Gamma_Curve : UInt4) is
    begin
-      Write_Command (LCD, 16#26#, (0 => Byte (Gamma_Curve)));
+      Write_Command (LCD, 16#26#, (0 => UInt8 (Gamma_Curve)));
    end Gamma_Set;
 
    ----------------------
    -- Set_Pixel_Format --
    ----------------------
 
-   procedure Set_Pixel_Format (LCD : ST7735R_Device; Pix_Fmt : Pixel_Format) is
-      Value : constant Byte := (case Pix_Fmt is
+   procedure Set_Pixel_Format (LCD : ST7735R_Screen; Pix_Fmt : Pixel_Format) is
+      Value : constant UInt8 := (case Pix_Fmt is
                                    when Pixel_12bits => 2#011#,
                                    when Pixel_16bits => 2#101#,
                                    when Pixel_18bits => 2#110#);
@@ -279,7 +315,7 @@ package body ST7735R is
    ----------------------------
 
    procedure Set_Memory_Data_Access
-     (LCD                 : ST7735R_Device;
+     (LCD                 : ST7735R_Screen;
       Color_Order         : RGB_BGR_Order;
       Vertical            : Vertical_Refresh_Order;
       Horizontal          : Horizontal_Refresh_Order;
@@ -296,7 +332,7 @@ package body ST7735R is
       Value.ML := Vertical;
       Value.RGB := Color_Order;
       Value.MH := Horizontal;
-      Write_Command (LCD, 16#36#, (0 => To_Byte (Value)));
+      Write_Command (LCD, 16#36#, (0 => To_UInt8 (Value)));
    end Set_Memory_Data_Access;
 
    ---------------------------
@@ -304,14 +340,14 @@ package body ST7735R is
    ---------------------------
 
    procedure Set_Frame_Rate_Normal
-     (LCD         : ST7735R_Device;
+     (LCD         : ST7735R_Screen;
       RTN         : UInt4;
       Front_Porch : UInt6;
       Back_Porch  : UInt6)
    is
    begin
       Write_Command (LCD, 16#B1#,
-                     (Byte (RTN), Byte (Front_Porch), Byte (Back_Porch)));
+                     (UInt8 (RTN), UInt8 (Front_Porch), UInt8 (Back_Porch)));
    end Set_Frame_Rate_Normal;
 
    -------------------------
@@ -319,14 +355,14 @@ package body ST7735R is
    -------------------------
 
    procedure Set_Frame_Rate_Idle
-     (LCD         : ST7735R_Device;
+     (LCD         : ST7735R_Screen;
       RTN         : UInt4;
       Front_Porch : UInt6;
       Back_Porch  : UInt6)
    is
    begin
       Write_Command (LCD, 16#B2#,
-                     (Byte (RTN), Byte (Front_Porch), Byte (Back_Porch)));
+                     (UInt8 (RTN), UInt8 (Front_Porch), UInt8 (Back_Porch)));
    end Set_Frame_Rate_Idle;
 
    ---------------------------------
@@ -334,7 +370,7 @@ package body ST7735R is
    ---------------------------------
 
    procedure Set_Frame_Rate_Partial_Full
-     (LCD              : ST7735R_Device;
+     (LCD              : ST7735R_Screen;
       RTN_Part         : UInt4;
       Front_Porch_Part : UInt6;
       Back_Porch_Part  : UInt6;
@@ -344,12 +380,12 @@ package body ST7735R is
    is
    begin
       Write_Command (LCD, 16#B3#,
-                     (Byte (RTN_Part),
-                      Byte (Front_Porch_Part),
-                      Byte (Back_Porch_Part),
-                      Byte (RTN_Full),
-                      Byte (Front_Porch_Full),
-                      Byte (Back_Porch_Full)));
+                     (UInt8 (RTN_Part),
+                      UInt8 (Front_Porch_Part),
+                      UInt8 (Back_Porch_Part),
+                      UInt8 (RTN_Full),
+                      UInt8 (Front_Porch_Full),
+                      UInt8 (Back_Porch_Full)));
    end Set_Frame_Rate_Partial_Full;
 
    ---------------------------
@@ -357,10 +393,10 @@ package body ST7735R is
    ---------------------------
 
    procedure Set_Inversion_Control
-     (LCD : ST7735R_Device;
+     (LCD : ST7735R_Screen;
       Normal, Idle, Full_Partial : Inversion_Control)
    is
-      Value : Byte := 0;
+      Value : UInt8 := 0;
    begin
       if Normal = Line_Inversion then
          Value := Value or 2#100#;
@@ -379,17 +415,17 @@ package body ST7735R is
    -------------------------
 
    procedure Set_Power_Control_1
-     (LCD  : ST7735R_Device;
+     (LCD  : ST7735R_Screen;
       AVDD : UInt3;
       VRHP : UInt5;
       VRHN : UInt5;
       MODE : UInt2)
    is
-      P1, P2, P3 : Byte;
+      P1, P2, P3 : UInt8;
    begin
-      P1 := Interfaces.Shift_Left (Byte (AVDD), 5) or Byte (VRHP);
-      P2 := Byte (VRHN);
-      P3 := Interfaces.Shift_Left (Byte (MODE), 6) or 2#00_0100#;
+      P1 := Shift_Left (UInt8 (AVDD), 5) or UInt8 (VRHP);
+      P2 := UInt8 (VRHN);
+      P3 := Shift_Left (UInt8 (MODE), 6) or 2#00_0100#;
       Write_Command (LCD, 16#C0#, (P1, P2, P3));
    end Set_Power_Control_1;
 
@@ -398,16 +434,16 @@ package body ST7735R is
    -------------------------
 
    procedure Set_Power_Control_2
-     (LCD   : ST7735R_Device;
+     (LCD   : ST7735R_Screen;
       VGH25 : UInt2;
       VGSEL : UInt2;
       VGHBT : UInt2)
    is
-      P1 : Byte;
+      P1 : UInt8;
    begin
-      P1 := Interfaces.Shift_Left (Byte (VGH25), 6) or
-        Interfaces.Shift_Left (Byte (VGSEL), 2) or
-        Byte (VGHBT);
+      P1 := Shift_Left (UInt8 (VGH25), 6) or
+        Shift_Left (UInt8 (VGSEL), 2) or
+        UInt8 (VGHBT);
       Write_Command (LCD, 16#C1#, (0 => P1));
    end Set_Power_Control_2;
 
@@ -416,8 +452,8 @@ package body ST7735R is
    -------------------------
 
    procedure Set_Power_Control_3
-     (LCD : ST7735R_Device;
-      P1, P2 : Byte)
+     (LCD : ST7735R_Screen;
+      P1, P2 : UInt8)
    is
    begin
       Write_Command (LCD, 16#C2#, (P1, P2));
@@ -428,8 +464,8 @@ package body ST7735R is
    -------------------------
 
    procedure Set_Power_Control_4
-     (LCD : ST7735R_Device;
-      P1, P2 : Byte)
+     (LCD : ST7735R_Screen;
+      P1, P2 : UInt8)
    is
    begin
       Write_Command (LCD, 16#C3#, (P1, P2));
@@ -440,8 +476,8 @@ package body ST7735R is
    -------------------------
 
    procedure Set_Power_Control_5
-     (LCD : ST7735R_Device;
-      P1, P2 : Byte)
+     (LCD : ST7735R_Screen;
+      P1, P2 : UInt8)
    is
    begin
       Write_Command (LCD, 16#C4#, (P1, P2));
@@ -451,23 +487,23 @@ package body ST7735R is
    -- Set_Vcom --
    --------------
 
-   procedure Set_Vcom (LCD : ST7735R_Device; VCOMS : UInt6) is
+   procedure Set_Vcom (LCD : ST7735R_Screen; VCOMS : UInt6) is
    begin
-      Write_Command (LCD, 16#C5#, (0 => Byte (VCOMS)));
+      Write_Command (LCD, 16#C5#, (0 => UInt8 (VCOMS)));
    end Set_Vcom;
 
    ------------------------
    -- Set_Column_Address --
    ------------------------
 
-   procedure Set_Column_Address (LCD : ST7735R_Device; X_Start, X_End : Short)
+   procedure Set_Column_Address (LCD : ST7735R_Screen; X_Start, X_End : UInt16)
    is
-      P1, P2, P3, P4 : Byte;
+      P1, P2, P3, P4 : UInt8;
    begin
-      P1 := Byte (Shift_Right (X_Start and 16#FF#, 8));
-      P2 := Byte (X_Start and 16#FF#);
-      P3 := Byte (Shift_Right (X_End and 16#FF#, 8));
-      P4 := Byte (X_End and 16#FF#);
+      P1 := UInt8 (Shift_Right (X_Start and 16#FF#, 8));
+      P2 := UInt8 (X_Start and 16#FF#);
+      P3 := UInt8 (Shift_Right (X_End and 16#FF#, 8));
+      P4 := UInt8 (X_End and 16#FF#);
       Write_Command (LCD, 16#2A#, (P1, P2, P3, P4));
    end Set_Column_Address;
 
@@ -475,14 +511,14 @@ package body ST7735R is
    -- Set_Row_Address --
    ---------------------
 
-   procedure Set_Row_Address (LCD : ST7735R_Device; Y_Start, Y_End : Short)
+   procedure Set_Row_Address (LCD : ST7735R_Screen; Y_Start, Y_End : UInt16)
    is
-      P1, P2, P3, P4 : Byte;
+      P1, P2, P3, P4 : UInt8;
    begin
-      P1 := Byte (Shift_Right (Y_Start and 16#FF#, 8));
-      P2 := Byte (Y_Start and 16#FF#);
-      P3 := Byte (Shift_Right (Y_End and 16#FF#, 8));
-      P4 := Byte (Y_End and 16#FF#);
+      P1 := UInt8 (Shift_Right (Y_Start and 16#FF#, 8));
+      P2 := UInt8 (Y_Start and 16#FF#);
+      P3 := UInt8 (Shift_Right (Y_End and 16#FF#, 8));
+      P4 := UInt8 (Y_End and 16#FF#);
       Write_Command (LCD, 16#2B#, (P1, P2, P3, P4));
    end Set_Row_Address;
 
@@ -490,8 +526,8 @@ package body ST7735R is
    -- Set_Address --
    -----------------
 
-   procedure Set_Address (LCD : ST7735R_Device;
-                          X_Start, X_End, Y_Start, Y_End : Short)
+   procedure Set_Address (LCD : ST7735R_Screen;
+                          X_Start, X_End, Y_Start, Y_End : UInt16)
    is
    begin
       Set_Column_Address (LCD, X_Start, X_End);
@@ -502,24 +538,49 @@ package body ST7735R is
    -- Set_Pixel --
    ---------------
 
-   procedure Set_Pixel (LCD   : ST7735R_Device;
-                        X, Y  : Short;
-                        Color : Short)
+   procedure Set_Pixel (LCD   : ST7735R_Screen;
+                        X, Y  : UInt16;
+                        Color : UInt16)
    is
-      Data : constant HAL.Short_Array (1 .. 1) := (1 => Color);
+      Data : HAL.UInt16_Array (1 .. 1) := (1 => Color);
    begin
       Set_Address (LCD, X, X + 1, Y, Y + 1);
       Write_Raw_Pixels (LCD, Data);
    end Set_Pixel;
 
+   -----------
+   -- Pixel --
+   -----------
+
+   function Pixel (LCD   : ST7735R_Screen;
+                    X, Y  : UInt16)
+                    return UInt16
+   is
+      Ret : UInt16;
+   begin
+      Set_Address (LCD, X, X + 1, Y, Y + 1);
+      Read_Data (LCD, Ret);
+      return Ret;
+   end Pixel;
+
    ----------------------
    -- Write_Raw_Pixels --
    ----------------------
 
-   procedure Write_Raw_Pixels (LCD  : ST7735R_Device;
-                               Data : HAL.Byte_Array)
+   procedure Write_Raw_Pixels (LCD  : ST7735R_Screen;
+                               Data : in out HAL.UInt8_Array)
    is
+      Index : Natural := Data'First + 1;
+      Tmp   : UInt8;
    begin
+      --  The ST7735R uses a different endianness than our bitmaps
+      while Index <= Data'Last loop
+         Tmp := Data (Index);
+         Data (Index) := Data (Index - 1);
+         Data (Index - 1) := Tmp;
+         Index := Index + 1;
+      end loop;
+
       Write_Command (LCD, 16#2C#);
       Write_Data (LCD, Data);
    end Write_Raw_Pixels;
@@ -528,12 +589,13 @@ package body ST7735R is
    -- Write_Raw_Pixels --
    ----------------------
 
-   procedure Write_Raw_Pixels (LCD  : ST7735R_Device;
-                               Data : HAL.Short_Array)
+   procedure Write_Raw_Pixels (LCD  : ST7735R_Screen;
+                               Data : in out HAL.UInt16_Array)
    is
+      Data_8b : HAL.UInt8_Array (1 .. Data'Length * 2)
+        with Address => Data'Address;
    begin
-      Write_Command (LCD, 16#2C#);
-      Write_Data (LCD, Data);
+      Write_Raw_Pixels (LCD, Data_8b);
    end Write_Raw_Pixels;
 
    --------------------
@@ -541,16 +603,16 @@ package body ST7735R is
    --------------------
 
    overriding
-   function Get_Max_Layers
-     (Display : ST7735R_Device) return Positive is (1);
+   function Max_Layers
+     (Display : ST7735R_Screen) return Positive is (1);
 
    ------------------
    -- Is_Supported --
    ------------------
 
    overriding
-   function Is_Supported
-     (Display : ST7735R_Device;
+   function Supported
+     (Display : ST7735R_Screen;
       Mode    : FB_Color_Mode) return Boolean is
      (Mode = HAL.Bitmap.RGB_565);
 
@@ -560,7 +622,7 @@ package body ST7735R is
 
    overriding
    procedure Set_Orientation
-     (Display     : in out ST7735R_Device;
+     (Display     : in out ST7735R_Screen;
       Orientation : Display_Orientation)
    is
    begin
@@ -573,7 +635,7 @@ package body ST7735R is
 
    overriding
    procedure Set_Mode
-     (Display : in out ST7735R_Device;
+     (Display : in out ST7735R_Screen;
       Mode    : Wait_Mode)
    is
    begin
@@ -585,24 +647,24 @@ package body ST7735R is
    ---------------
 
    overriding
-   function Get_Width
-     (Display : ST7735R_Device) return Positive is (Screen_Width);
+   function Width
+     (Display : ST7735R_Screen) return Positive is (Screen_Width);
 
    ----------------
    -- Get_Height --
    ----------------
 
    overriding
-   function Get_Height
-     (Display : ST7735R_Device) return Positive is (Screen_Height);
+   function Height
+     (Display : ST7735R_Screen) return Positive is (Screen_Height);
 
    ----------------
    -- Is_Swapped --
    ----------------
 
    overriding
-   function Is_Swapped
-     (Display : ST7735R_Device) return Boolean is (False);
+   function Swapped
+     (Display : ST7735R_Screen) return Boolean is (False);
 
    --------------------
    -- Set_Background --
@@ -610,7 +672,7 @@ package body ST7735R is
 
    overriding
    procedure Set_Background
-     (Display : ST7735R_Device; R, G, B : Byte)
+     (Display : ST7735R_Screen; R, G, B : UInt8)
    is
    begin
       --  Does it make sense when there's no alpha channel...
@@ -623,7 +685,7 @@ package body ST7735R is
 
    overriding
    procedure Initialize_Layer
-     (Display : in out ST7735R_Device;
+     (Display : in out ST7735R_Screen;
       Layer   : Positive;
       Mode    : FB_Color_Mode;
       X       : Natural := 0;
@@ -631,17 +693,13 @@ package body ST7735R is
       Width   : Positive := Positive'Last;
       Height  : Positive := Positive'Last)
    is
-      pragma Unreferenced (X, Y, Width, Height);
+      pragma Unreferenced (X, Y);
    begin
       if Layer /= 1 or else Mode /= RGB_565 then
          raise Program_Error;
       end if;
-
-      Display.Layer.Width := Screen_Width;
-      Display.Layer.Height := Screen_Height;
-      Display.Layer.Addr := Display.Layer_Data'Address;
-      Display.Layer.Color_Mode := Mode;
-      Display.Layer_Initialized := True;
+      Display.Layer.Width := Width;
+      Display.Layer.Height := Height;
    end Initialize_Layer;
 
    -----------------
@@ -650,11 +708,12 @@ package body ST7735R is
 
    overriding
    function Initialized
-     (Display : ST7735R_Device;
+     (Display : ST7735R_Screen;
       Layer   : Positive) return Boolean
    is
+      pragma Unreferenced (Display);
    begin
-      return Layer = 1 and then Display.Layer_Initialized;
+      return Layer = 1;
    end Initialized;
 
    ------------------
@@ -663,23 +722,16 @@ package body ST7735R is
 
    overriding
    procedure Update_Layer
-     (Display   : in out ST7735R_Device;
+     (Display   : in out ST7735R_Screen;
       Layer     : Positive;
       Copy_Back : Boolean := False)
    is
-      pragma Unreferenced (Copy_Back);
+      pragma Unreferenced (Copy_Back, Display);
    begin
       if Layer /= 1 then
          raise Program_Error;
       end if;
-      Set_Address (Display,
-                   X_Start => 0,
-                   X_End   => Unsigned_16 (Display.Layer.Width - 1),
-                   Y_Start => 0,
-                   Y_End   => Unsigned_16 (Display.Layer.Height - 1));
-      Display.Write_Raw_Pixels (Display.Layer_Data);
    end Update_Layer;
-
 
    -------------------
    -- Update_Layers --
@@ -687,7 +739,7 @@ package body ST7735R is
 
    overriding
    procedure Update_Layers
-     (Display : in out ST7735R_Device)
+     (Display : in out ST7735R_Screen)
    is
    begin
       Display.Update_Layer (1);
@@ -698,40 +750,192 @@ package body ST7735R is
    --------------------
 
    overriding
-   function Get_Color_Mode
-     (Display : ST7735R_Device;
+   function Color_Mode
+     (Display : ST7735R_Screen;
       Layer   : Positive) return FB_Color_Mode
    is
+      pragma Unreferenced (Display);
    begin
       if Layer /= 1 then
          raise Program_Error;
       end if;
-      return Display.Layer.Color_Mode;
-   end Get_Color_Mode;
+      return RGB_565;
+   end Color_Mode;
 
    -----------------------
    -- Get_Hidden_Buffer --
    -----------------------
 
    overriding
-   function Get_Hidden_Buffer
-     (Display : ST7735R_Device;
-      Layer   : Positive) return HAL.Bitmap.Bitmap_Buffer'Class
+   function Hidden_Buffer
+     (Display : in out ST7735R_Screen;
+      Layer   : Positive) return not null HAL.Bitmap.Any_Bitmap_Buffer
    is
    begin
       if Layer /= 1 then
          raise Program_Error;
       end if;
-      return Display.Layer;
-   end Get_Hidden_Buffer;
+      return Display.Layer'Unchecked_Access;
+   end Hidden_Buffer;
 
-   --------------------
-   -- Get_Pixel_Size --
-   --------------------
+   ----------------
+   -- Pixel_Size --
+   ----------------
 
    overriding
-   function Get_Pixel_Size
-     (Display : ST7735R_Device;
+   function Pixel_Size
+     (Display : ST7735R_Screen;
       Layer   : Positive) return Positive is (16);
+
+   ----------------
+   -- Set_Source --
+   ----------------
+
+   overriding
+   procedure Set_Source (Buffer : in out ST7735R_Bitmap_Buffer;
+                         Native : UInt32)
+   is
+   begin
+      Buffer.Native_Source := Native;
+   end Set_Source;
+
+   ------------
+   -- Source --
+   ------------
+
+   overriding
+   function Source
+     (Buffer : ST7735R_Bitmap_Buffer)
+      return UInt32
+   is
+   begin
+      return Buffer.Native_Source;
+   end Source;
+
+
+   ---------------
+   -- Set_Pixel --
+   ---------------
+
+   overriding
+   procedure Set_Pixel
+     (Buffer  : in out ST7735R_Bitmap_Buffer;
+      Pt      : Point)
+   is
+   begin
+      Buffer.LCD.Set_Pixel (UInt16 (Pt.X), UInt16 (Pt.Y),
+                            UInt16 (Buffer.Native_Source));
+   end Set_Pixel;
+
+   ---------------------
+   -- Set_Pixel_Blend --
+   ---------------------
+
+   overriding
+   procedure Set_Pixel_Blend
+     (Buffer : in out ST7735R_Bitmap_Buffer;
+      Pt     : Point) renames Set_Pixel;
+
+   -----------
+   -- Pixel --
+   -----------
+
+   overriding
+   function Pixel
+     (Buffer : ST7735R_Bitmap_Buffer;
+      Pt     : Point)
+      return UInt32
+   is (UInt32 (Buffer.LCD.Pixel (UInt16 (Pt.X), UInt16 (Pt.Y))));
+
+   ----------
+   -- Fill --
+   ----------
+
+   overriding
+   procedure Fill
+     (Buffer : in out ST7735R_Bitmap_Buffer)
+   is
+   begin
+      --  Set the drawing area over the entire layer
+      Set_Address (Buffer.LCD.all,
+                   0, UInt16 (Buffer.Width - 1),
+                   0, UInt16 (Buffer.Height - 1));
+
+      --  Fill the drawing area with a single color
+      Write_Pix_Repeat (Buffer.LCD.all,
+                        UInt16 (Buffer.Native_Source and 16#FFFF#),
+                        Buffer.Width * Buffer.Height);
+   end Fill;
+
+   ---------------
+   -- Fill_Rect --
+   ---------------
+
+   overriding
+   procedure Fill_Rect
+     (Buffer : in out ST7735R_Bitmap_Buffer;
+      Area   : Rect)
+   is
+   begin
+      --  Set the drawing area coresponding to the rectangle to draw
+      Set_Address (Buffer.LCD.all,
+                   UInt16 (Area.Position.X),
+                   UInt16 (Area.Position.X + Area.Width - 1),
+                   UInt16 (Area.Position.Y),
+                   UInt16 (Area.Position.Y + Area.Height - 1));
+
+      --  Fill the drawing area with a single color
+      Write_Pix_Repeat (Buffer.LCD.all,
+                        UInt16 (Buffer.Native_Source and 16#FFFF#),
+                        Area.Width * Area.Height);
+   end Fill_Rect;
+
+   ------------------------
+   -- Draw_Vertical_Line --
+   ------------------------
+
+   overriding
+   procedure Draw_Vertical_Line
+     (Buffer : in out ST7735R_Bitmap_Buffer;
+      Pt     : Point;
+      Height : Integer)
+   is
+   begin
+      --  Set the drawing area coresponding to the line to draw
+      Set_Address (Buffer.LCD.all,
+                   UInt16 (Pt.X),
+                   UInt16 (Pt.X),
+                   UInt16 (Pt.Y),
+                   UInt16 (Pt.Y + Height - 1));
+
+      --  Fill the drawing area with a single color
+      Write_Pix_Repeat (Buffer.LCD.all,
+                        UInt16 (Buffer.Native_Source and 16#FFFF#),
+                        Height);
+   end Draw_Vertical_Line;
+
+   --------------------------
+   -- Draw_Horizontal_Line --
+   --------------------------
+
+   overriding
+   procedure Draw_Horizontal_Line
+     (Buffer : in out ST7735R_Bitmap_Buffer;
+      Pt     : Point;
+      Width  : Integer)
+   is
+   begin
+      --  Set the drawing area coresponding to the line to draw
+      Set_Address (Buffer.LCD.all,
+                   UInt16 (Pt.X),
+                   UInt16 (Pt.X + Width),
+                   UInt16 (Pt.Y),
+                   UInt16 (Pt.Y));
+
+      --  Fill the drawing area with a single color
+      Write_Pix_Repeat (Buffer.LCD.all,
+                        UInt16 (Buffer.Native_Source and 16#FFFF#),
+                        Width);
+   end Draw_Horizontal_Line;
 
 end ST7735R;

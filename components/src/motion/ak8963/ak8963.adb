@@ -1,5 +1,35 @@
+------------------------------------------------------------------------------
+--                                                                          --
+--                     Copyright (C) 2015-2016, AdaCore                     --
+--                                                                          --
+--  Redistribution and use in source and binary forms, with or without      --
+--  modification, are permitted provided that the following conditions are  --
+--  met:                                                                    --
+--     1. Redistributions of source code must retain the above copyright    --
+--        notice, this list of conditions and the following disclaimer.     --
+--     2. Redistributions in binary form must reproduce the above copyright --
+--        notice, this list of conditions and the following disclaimer in   --
+--        the documentation and/or other materials provided with the        --
+--        distribution.                                                     --
+--     3. Neither the name of the copyright holder nor the names of its     --
+--        contributors may be used to endorse or promote products derived   --
+--        from this software without specific prior written permission.     --
+--                                                                          --
+--   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS    --
+--   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT      --
+--   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR  --
+--   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT   --
+--   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, --
+--   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT       --
+--   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,  --
+--   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY  --
+--   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT    --
+--   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE  --
+--   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   --
+--                                                                          --
+------------------------------------------------------------------------------
+
 with Ada.Unchecked_Conversion;
-with Ada.Real_Time; use Ada.Real_Time;
 with Interfaces;    use Interfaces;
 
 with HAL.I2C;       use HAL.I2C;
@@ -42,21 +72,21 @@ package body AK8963 is
 
    function I2C_Read
      (Device : AK8963_Device;
-      Reg    : Short) return Byte;
+      Reg    : UInt16) return UInt8;
 
    function I2C_Read
      (Device : AK8963_Device;
-      Reg    : Short;
+      Reg    : UInt16;
       Bit    : Natural) return Boolean;
 
    procedure I2C_Write
      (Device : AK8963_Device;
-      Reg    : Short;
-      Data   : Byte);
+      Reg    : UInt16;
+      Data   : UInt8);
 
    procedure I2C_Write
      (Device : AK8963_Device;
-      Reg    : Short;
+      Reg    : UInt16;
       Bit    : Natural;
       State  : Boolean);
 
@@ -66,7 +96,7 @@ package body AK8963 is
 
    function I2C_Read
      (Device : AK8963_Device;
-      Reg    : Short) return Byte
+      Reg    : UInt16) return UInt8
    is
       Data   : I2C_Data (1 .. 1);
       Status : I2C_Status;
@@ -86,11 +116,11 @@ package body AK8963 is
 
    function I2C_Read
      (Device : AK8963_Device;
-      Reg    : Short;
+      Reg    : UInt16;
       Bit    : Natural) return Boolean
    is
-      Mask : constant Byte := 2 ** Bit;
-      Data : constant Byte := I2C_Read (Device, Reg);
+      Mask : constant UInt8 := 2 ** Bit;
+      Data : constant UInt8 := I2C_Read (Device, Reg);
    begin
       return (Data and Mask) /= 0;
    end I2C_Read;
@@ -101,8 +131,8 @@ package body AK8963 is
 
    procedure I2C_Write
      (Device : AK8963_Device;
-      Reg    : Short;
-      Data   : Byte)
+      Reg    : UInt16;
+      Data   : UInt8)
    is
       Status : I2C_Status with Unreferenced;
    begin
@@ -120,12 +150,12 @@ package body AK8963 is
 
    procedure I2C_Write
      (Device : AK8963_Device;
-      Reg    : Short;
+      Reg    : UInt16;
       Bit    : Natural;
       State  : Boolean)
    is
-      Val  : Byte := I2C_Read (Device, Reg);
-      Mask : constant Byte := 2 ** Bit;
+      Val  : UInt8 := I2C_Read (Device, Reg);
+      Mask : constant UInt8 := 2 ** Bit;
    begin
       if State then
          Val := Val or Mask;
@@ -182,7 +212,7 @@ package body AK8963 is
    function Self_Test (Device : in out AK8963_Device) return Boolean
    is
       Mx, My, Mz : Gauss;
-      Conf_Save  : Byte;
+      Conf_Save  : UInt8;
       Retry      : Natural := 20;
       Ret        : Boolean;
       Dead       : Boolean with Unreferenced;
@@ -206,7 +236,7 @@ package body AK8963 is
       while Retry > 0 loop
          exit when Get_Data_Ready (Device);
          Retry := Retry - 1;
-         delay until Clock + Milliseconds (10);
+         Device.Time.Delay_Milliseconds (10);
       end loop;
 
       if Retry = 0 then
@@ -243,7 +273,7 @@ package body AK8963 is
       Operation_Mode : AK8963_Operation_Mode;
       Sampling_Mode  : AK8963_Sampling_Mode)
    is
-      Mode   : constant Byte :=
+      Mode   : constant UInt8 :=
                  AK8963_Operation_Mode'Enum_Rep (Operation_Mode)
                    or AK8963_Sampling_Mode'Enum_Rep (Sampling_Mode);
    begin
@@ -258,7 +288,7 @@ package body AK8963 is
      (Device         : in out AK8963_Device;
       Operation_Mode : AK8963_Operation_Mode)
    is
-      Mode   : constant Byte :=
+      Mode   : constant UInt8 :=
                  AK8963_Operation_Mode'Enum_Rep (Operation_Mode);
    begin
       I2C_Write (Device, AK8963_RA_CNTL, Mode);
@@ -286,7 +316,7 @@ package body AK8963 is
       Buffer : I2C_Data (1 .. 6);
       Status : I2C_Status;
       function To_Signed is new
-        Ada.Unchecked_Conversion (Unsigned_16, Integer_16);
+        Ada.Unchecked_Conversion (UInt16, Integer_16);
 
    begin
       Mem_Read
@@ -303,14 +333,14 @@ package body AK8963 is
          Mz := 0.0;
       else
          Mx :=
-           Float (To_Signed (Shift_Left (Unsigned_16 (Buffer (2)), 8)
-                  or Unsigned_16 (Buffer (1)))) * MAG_TO_GAUSS;
+           Float (To_Signed (Shift_Left (UInt16 (Buffer (2)), 8)
+                  or UInt16 (Buffer (1)))) * MAG_TO_GAUSS;
          My :=
-           Float (To_Signed (Shift_Left (Unsigned_16 (Buffer (4)), 8)
-                  or Unsigned_16 (Buffer (3)))) * MAG_TO_GAUSS;
+           Float (To_Signed (Shift_Left (UInt16 (Buffer (4)), 8)
+                  or UInt16 (Buffer (3)))) * MAG_TO_GAUSS;
          Mz :=
-           Float (To_Signed (Shift_Left (Unsigned_16 (Buffer (6)), 8)
-                  or Unsigned_16 (Buffer (5)))) * MAG_TO_GAUSS;
+           Float (To_Signed (Shift_Left (UInt16 (Buffer (6)), 8)
+                  or UInt16 (Buffer (5)))) * MAG_TO_GAUSS;
 
          --  Read the sensitivity adjustment data
          Mem_Read
@@ -323,8 +353,8 @@ package body AK8963 is
 
          if Status = Ok then
             Mx := Mx * ((Float (Buffer (1)) - 128.0) / 256.0 + 1.0);
-            My := My * ((Float (Buffer (1)) - 128.0) / 256.0 + 1.0);
-            Mz := Mz * ((Float (Buffer (1)) - 128.0) / 256.0 + 1.0);
+            My := My * ((Float (Buffer (2)) - 128.0) / 256.0 + 1.0);
+            Mz := Mz * ((Float (Buffer (3)) - 128.0) / 256.0 + 1.0);
          end if;
       end if;
    end Get_Heading;

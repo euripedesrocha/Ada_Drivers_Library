@@ -42,15 +42,13 @@
 ------------------------------------------------------------------------------
 
 with Ada.Unchecked_Conversion;
-with Ada.Real_Time; use Ada.Real_Time;
-with Interfaces;    use Interfaces;
 
-with ILI9341_Regs;  use ILI9341_Regs;
+with ILI9341_Regs; use ILI9341_Regs;
 
 package body ILI9341 is
 
-   function As_Short is new Ada.Unchecked_Conversion
-     (Source => Colors, Target => Short);
+   function As_UInt16 is new Ada.Unchecked_Conversion
+     (Source => Colors, Target => UInt16);
 
    -------------------
    -- Current_Width --
@@ -107,15 +105,15 @@ package body ILI9341 is
       Y     : Height;
       Color : Colors)
    is
-      Color_High_Byte : constant Byte :=
-        Byte (Shift_Right (As_Short (Color), 8));
-      Color_Low_Byte  : constant Byte :=
-        Byte (As_Short (Color) and 16#FF#);
+      Color_High_UInt8 : constant UInt8 :=
+        UInt8 (Shift_Right (As_UInt16 (Color), 8));
+      Color_Low_UInt8  : constant UInt8 :=
+        UInt8 (As_UInt16 (Color) and 16#FF#);
    begin
       This.Set_Cursor_Position (X, Y, X, Y);
       This.Send_Command (ILI9341_GRAM);
-      This.Send_Data (Color_High_Byte);
-      This.Send_Data (Color_Low_Byte);
+      This.Send_Data (Color_High_UInt8);
+      This.Send_Data (Color_Low_UInt8);
    end Set_Pixel;
 
    ----------
@@ -123,10 +121,10 @@ package body ILI9341 is
    ----------
 
    procedure Fill (This : in out ILI9341_Device; Color : Colors) is
-      Color_High_Byte : constant Byte :=
-        Byte (Shift_Right (As_Short (Color), 8));
-      Color_Low_Byte  : constant Byte :=
-        Byte (As_Short (Color) and 16#FF#);
+      Color_High_UInt8 : constant UInt8 :=
+        UInt8 (Shift_Right (As_UInt16 (Color), 8));
+      Color_Low_UInt8  : constant UInt8 :=
+        UInt8 (As_UInt16 (Color) and 16#FF#);
    begin
       This.Set_Cursor_Position (X1 => 0,
                                 Y1 => 0,
@@ -135,8 +133,8 @@ package body ILI9341 is
 
       This.Send_Command (ILI9341_GRAM);
       for N in 1 .. (Device_Width * Device_Height) loop
-         This.Send_Data (Color_High_Byte);
-         This.Send_Data (Color_Low_Byte);
+         This.Send_Data (Color_High_UInt8);
+         This.Send_Data (Color_Low_UInt8);
       end loop;
    end Fill;
 
@@ -197,15 +195,15 @@ package body ILI9341 is
       X2   : Width;
       Y2   : Height)
    is
-      X1_High : constant Byte := Byte (Shift_Right (Short (X1), 8));
-      X1_Low  : constant Byte := Byte (Short (X1) and 16#FF#);
-      X2_High : constant Byte := Byte (Shift_Right (Short (X2), 8));
-      X2_Low  : constant Byte := Byte (Short (X2) and 16#FF#);
+      X1_High : constant UInt8 := UInt8 (Shift_Right (UInt16 (X1), 8));
+      X1_Low  : constant UInt8 := UInt8 (UInt16 (X1) and 16#FF#);
+      X2_High : constant UInt8 := UInt8 (Shift_Right (UInt16 (X2), 8));
+      X2_Low  : constant UInt8 := UInt8 (UInt16 (X2) and 16#FF#);
 
-      Y1_High : constant Byte := Byte (Shift_Right (Short (Y1), 8));
-      Y1_Low  : constant Byte := Byte (Short (Y1) and 16#FF#);
-      Y2_High : constant Byte := Byte (Shift_Right (Short (Y2), 8));
-      Y2_Low  : constant Byte := Byte (Short (Y2) and 16#FF#);
+      Y1_High : constant UInt8 := UInt8 (Shift_Right (UInt16 (Y1), 8));
+      Y1_Low  : constant UInt8 := UInt8 (UInt16 (Y1) and 16#FF#);
+      Y2_High : constant UInt8 := UInt8 (Shift_Right (UInt16 (Y2), 8));
+      Y2_Low  : constant UInt8 := UInt8 (UInt16 (Y2) and 16#FF#);
    begin
       This.Send_Command (ILI9341_COLUMN_ADDR);
       This.Send_Data (X1_High);
@@ -242,7 +240,7 @@ package body ILI9341 is
    -- Send_Data --
    ---------------
 
-   procedure Send_Data (This : in out ILI9341_Device; Data : Byte) is
+   procedure Send_Data (This : in out ILI9341_Device; Data : UInt8) is
       Status : SPI_Status;
    begin
       This.WRX.Set;
@@ -258,7 +256,7 @@ package body ILI9341 is
    -- Send_Command --
    ------------------
 
-   procedure Send_Command (This : in out ILI9341_Device; Cmd : Byte) is
+   procedure Send_Command (This : in out ILI9341_Device; Cmd : UInt8) is
       Status : SPI_Status;
    begin
       This.WRX.Clear;
@@ -279,7 +277,7 @@ package body ILI9341 is
    begin
       This.Reset.Set;
       This.Send_Command (ILI9341_RESET);
-      delay until Clock + Milliseconds (5);
+      This.Time.Delay_Milliseconds (5);
 
       This.Send_Command (ILI9341_POWERA);
       This.Send_Data (16#39#);
@@ -390,9 +388,9 @@ package body ILI9341 is
 
       case Mode is
          when RGB_Mode =>
-            delay until Clock + Milliseconds (150);
+            This.Time.Delay_Milliseconds (150);
          when SPI_Mode =>
-            delay until Clock + Milliseconds (20);
+            This.Time.Delay_Milliseconds (20);
       end case;
       --  document ILI9341_DS_V1.02, section 11.2, pg 205 says we need
       --  either 120ms or 5ms, depending on the mode, but seems incorrect.

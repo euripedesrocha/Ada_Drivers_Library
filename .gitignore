@@ -6,7 +6,13 @@
 *.cgpr
 *.bexch
 *.lexch
-*.a
 *.ci
 *.cswi
+*.stderr
+*.stdout
 *~
+*.pyc
+obj/
+lib/
+
+examples/HiFive1/zfp-hifive1/

@@ -1,34 +1,36 @@
-# Warning!
+[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/ada-lang/Ada_Drivers_Library)
+[![Linux Build Status](https://travis-ci.org/AdaCore/Ada_Drivers_Library.svg?branch=master)](https://travis-ci.org/AdaCore/Ada_Drivers_Library)
+[![Windows Build status](https://ci.appveyor.com/api/projects/status/github/AdaCore/Ada_Drivers_Library?branch=master&svg=true)](https://ci.appveyor.com/project/github-integration-adacore/ada-drivers-library)
 
-This repository uses git submodule, please clone with the --recursive option:
+# 1. Introduction
 
-```shell
-git clone --recursive https://github.com/AdaCore/Ada_Drivers_Library.git
-```
+This repository contains drivers and sample projects to program
+micro-controllers with the Ada and SPARK languages. The library also provides
+some middleware services and drivers for external devices such as sensors. We
+intend this to be a location for both AdaCore and the community in general to
+contribute support for additional processors, platforms, and vendors.
 
-1. Introduction
----------------
+# 2. Supported hardware
 
-This repository contains Ada source code and complete sample GNAT projects for
-selected bare-board platforms supported by GNAT.  Initially the repository
-contains software for ARM platforms from a specific vendor, but we intend this
-to be a location for both AdaCore and the community in general to contribute
-support for additional processors, platforms, and vendors.
+Ada_Drivers_Library provides support for various devices in the ARM Cortex-M
+and RISC-V architectures. Some devices are only partially supported. Go to the
+[boards directory](boards/) for a list of supported hardware.
 
+# 3. Getting started
 
-2. License
-----------
+To start using the Ada_Drivers_Library, please go to the [examples
+directory](examples/) where you will find instructions to run your first
+project.
 
-All files are provided under a non-restrictive Berkeley Software Distribution
-(BSD) license.  As such, and within the conditions required by the license, the
-files are available both for proprietary ("commercial") and non-proprietary use.
+# 4. License
 
-For details, see the "License" section in the release notes accompanying the HAL
-drivers provided by ST Microelectronics.
+All files are provided under a 3-clause Berkeley Software Distribution (BSD)
+license. As such, and within the conditions required by the license, the files
+are available both for proprietary ("commercial") and non-proprietary use.
 
+For details, see the `LICENSE` file in the root directory.
 
-3. Requirements
----------------
+# 5. Requirements
 
 The software is written in Ada 2012 and uses, for example, preconditions,
 postconditions, and the high-level iterator form of for-loops.
@@ -36,35 +38,46 @@ postconditions, and the high-level iterator form of for-loops.
 In addition, a GNAT implementation-defined pragma is used extensively. This
 pragma makes it possible to avoid explicit temporary copies when assigning
 components of types representing hardware registers requiring full word or full
-half-word accesses. The pragma is named Volatile_Full_Access. Those persons
+half-word accesses. The pragma is named `Volatile_Full_Access`. Those persons
 wishing to submit additions to the library should see the GNAT Reference Manual
 for details.
 
 Therefore, building with the sources requires a compiler supporting both Ada
-2012 and the GNAT-defined pragma Volatile_Full_Access. The "GNAT GPL 2016"
-compiler for ARM ELF is one such compiler [(Download it
-here)](http://libre.adacore.com/download/configurations). A recent GNAT Pro
-compiler for that target will also suffice.
+2012 and the GNAT-defined pragma `Volatile_Full_Access`. For instance a recent
+GNAT Pro compiler or GNAT Community 2018 for ARM ELF or RISC-V ELF [(Download
+here)](http://adacore.com/download).
 
+# 6. Roadmap
 
-4. Content
-----------
+Here is a list of projects that we are either dreaming about or already working
+on. If you are interested by one of those, please contact us on the project's
+GitHub page.
 
-Initial provision is for the hardware in the STM32F4 family of 32-bit MCUs, as
-defined in the "RM0090 Reference Manual" (Doc ID 018909 Rev 6, Feb 2014) by
-STMicroelectronics and made available on the "STM32F4 Discovery" and the
-"STM32F429 Discovery" kit boards.
+* ARM
+ * STM32F4/7 USB drivers
+* Components
+ * BlueNRG-MS (Bluetooth Low Energy Network Processor)
+* Services
+ * Bluetooth Low Energy stack
+ * USB stack
 
-Specifically, there are low-level device drivers, higher-level component drivers,
-small demonstration programs for the drivers, and larger example applications.
-"Component" drivers are those that are implemented using the lower-level device
-drivers (e.g., SPI or GPIO), such as the gyroscope and accelerometer on the
-Discovery boards.
+# 7. Project using the Ada_Drivers_Library
 
-The small driver demonstration programs and the larger applications programs are
-provided as full projects, including GNAT project files, and are ready to build
-either within GPS or on the command-line.
+ * [Certyflie: Ada/SPARK flight controller for the Crazyflie 2.0](https://github.com/AdaCore/Certyflie)
+ * [ACNC: A Gcode interpreter and CNC controller](https://github.com/Fabien-Chouteau/ACNC)
+ * [AMCQ: Multiple Choice Questions candy dispenser](https://github.com/Fabien-Chouteau/AMCQ)
+ * [Giza: Giza is trying to be a simple widget tool kit for embedded platforms](https://github.com/Fabien-Chouteau/Giza)
+ * [solenoid-engine-controller: Software controller for solenoid engines](https://github.com/Fabien-Chouteau/solenoid-engine-controller)
+ * [un_pola: DIY instant camera with OpenMV](https://github.com/Fabien-Chouteau/un_pola)
+ * [bare metal demos: Various Ada Demos on STM32*-Disco boards using this library](https://github.com/lambourg/Ada_Bare_Metal_Demos)
+ * [SPARK Railway Demo: Simulated railway network in SPARK/Ada](https://github.com/AdaCore/SPARK_Railway_Simulation_Demo)
+ * [NXT Lego Robotics: Ada drivers and demos for Lego NXT sensors and motors](https://github.com/AdaCore/Robotics_with_Ada)
+ * [Bosch 9DOF IMU demo: Bosch 9DOF IMU driving a 3-D model of a lunar lander](
+https://github.com/AdaCore/Lunar_Lander_Rotation_Demo)
+ * [Bare metal sudoku solver](https://github.com/stangassinger/sudoku)
+ * [Demo of an Ada physics engine](https://github.com/Kidev/DemoAdaPhysics2D)
+ * [High Integrity Sumobot: A fully functional sumobot written in Ada/SPARK](https://github.com/bosepchuk/High_Integrity_Sumobot)
+ * [RC Car: A remotely-controlled car built without the NXT Brick, written completely in Ada and SPARK](https://github.com/AdaCore/RC_Car_Demo)
 
-Not all devices defined by the Reference Manual are supported, and not all those
-supported are complete. We encourage contributions of corrections, enhancements,
-and new drivers.
+(Add yours to the list!)
+

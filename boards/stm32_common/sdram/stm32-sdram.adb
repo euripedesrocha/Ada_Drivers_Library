@@ -1,7 +1,35 @@
+------------------------------------------------------------------------------
+--                                                                          --
+--                     Copyright (C) 2015-2016, AdaCore                     --
+--                                                                          --
+--  Redistribution and use in source and binary forms, with or without      --
+--  modification, are permitted provided that the following conditions are  --
+--  met:                                                                    --
+--     1. Redistributions of source code must retain the above copyright    --
+--        notice, this list of conditions and the following disclaimer.     --
+--     2. Redistributions in binary form must reproduce the above copyright --
+--        notice, this list of conditions and the following disclaimer in   --
+--        the documentation and/or other materials provided with the        --
+--        distribution.                                                     --
+--     3. Neither the name of the copyright holder nor the names of its     --
+--        contributors may be used to endorse or promote products derived   --
+--        from this software without specific prior written permission.     --
+--                                                                          --
+--   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS    --
+--   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT      --
+--   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR  --
+--   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT   --
+--   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, --
+--   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT       --
+--   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,  --
+--   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY  --
+--   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT    --
+--   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE  --
+--   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   --
+--                                                                          --
+------------------------------------------------------------------------------
+
 with Ada.Real_Time;   use Ada.Real_Time;
-pragma Warnings (Off, "* is an internal GNAT unit*");
-with System.BB.Parameters;
-pragma Warnings (On, "* is an internal GNAT unit*");
 
 with STM32.Board;     use STM32.Board;
 with STM32.Device;    use STM32.Device;
@@ -13,7 +41,7 @@ with STM32_SVD.RCC;   use STM32_SVD.RCC;
 package body STM32.SDRAM is
 
    Initialized : Boolean := False;
-   G_Base_Addr : Word;
+   G_Base_Addr : UInt32;
 
    procedure SDRAM_GPIOConfig;
    procedure SDRAM_InitSequence;
@@ -28,11 +56,12 @@ package body STM32.SDRAM is
       Enable_Clock (SDRAM_PINS);
 
       Configure_IO (SDRAM_PINS,
-                    (Speed       => Speed_50MHz,
-                     Mode        => Mode_AF,
-                     Output_Type => Push_Pull,
-                     Resistors   => Pull_Up));
-      Configure_Alternate_Function (SDRAM_PINS, GPIO_AF_12_FMC);
+                    (Mode           => Mode_AF,
+                     AF             => GPIO_AF_FMC_12,
+                     AF_Speed       => Speed_50MHz,
+                     AF_Output_Type => Push_Pull,
+                     Resistors      => Pull_Up));
+
       Lock (SDRAM_PINS);
    end SDRAM_GPIOConfig;
 
@@ -110,9 +139,9 @@ package body STM32.SDRAM is
    is
       Timing_Conf     : FMC_SDRAM_TimingInit_Config;
       SDRAM_Conf      : FMC_SDRAM_Init_Config;
-      SDCLK           : constant :=
-                          System.BB.Parameters.Clock_Frequency / 2;
-      SDPeriod_In_ns  : constant :=
+      SDCLK           : constant Unsigned_32 :=
+        Unsigned_32 (STM32.Device.System_Clock_Frequencies.SYSCLK / 2);
+      SDPeriod_In_ns  : constant Unsigned_32 :=
                           1_000_000_000 / SDCLK;
       Refresh_Delay   : Unsigned_32;
 
@@ -202,12 +231,12 @@ package body STM32.SDRAM is
    -------------
 
    function Reserve
-     (Amount : Word;
-      Align  : Word := Standard'Maximum_Alignment) return System.Address
+     (Amount : UInt32;
+      Align  : UInt32 := Standard'Maximum_Alignment) return System.Address
    is
       Ret          : constant System.Address :=
                        System'To_Address (G_Base_Addr);
-      Rounded_Size : Word;
+      Rounded_Size : UInt32;
 
    begin
       Initialize;

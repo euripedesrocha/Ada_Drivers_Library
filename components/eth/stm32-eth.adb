@@ -11,7 +11,7 @@
 --        notice, this list of conditions and the following disclaimer in   --
 --        the documentation and/or other materials provided with the        --
 --        distribution.                                                     --
---     3. Neither the name of STMicroelectronics nor the names of its       --
+--     3. Neither the name of the copyright holder nor the names of its     --
 --        contributors may be used to endorse or promote products derived   --
 --        from this software without specific prior written permission.     --
 --                                                                          --
@@ -75,16 +75,16 @@ package body STM32.Eth is
       --  Select RMII (before enabling the clocks)
       STM32_SVD.SYSCFG.SYSCFG_Periph.PMC.MII_RMII_SEL := True;
 
-      Configure_Alternate_Function (PA1,  GPIO_AF_11_ETH); -- RMII_REF_CLK
-      Configure_Alternate_Function (PA2,  GPIO_AF_11_ETH); -- RMII_MDIO
-      Configure_Alternate_Function (PA7,  GPIO_AF_11_ETH); -- RMII_CRS_DV
-      Configure_Alternate_Function (PC1,  GPIO_AF_11_ETH); -- RMII_MDC
-      Configure_Alternate_Function (PC4,  GPIO_AF_11_ETH); -- RMII_RXD0
-      Configure_Alternate_Function (PC5,  GPIO_AF_11_ETH); -- RMII_RXD1
-      Configure_Alternate_Function (PG2,  GPIO_AF_11_ETH); -- RMII_RXER
-      Configure_Alternate_Function (PG11, GPIO_AF_11_ETH); -- RMII_TX_EN
-      Configure_Alternate_Function (PG13, GPIO_AF_11_ETH); -- RMII_TXD0
-      Configure_Alternate_Function (PG14, GPIO_AF_11_ETH); -- RMII_TXD1
+      Configure_Alternate_Function (PA1,  GPIO_AF_ETH_11); -- RMII_REF_CLK
+      Configure_Alternate_Function (PA2,  GPIO_AF_ETH_11); -- RMII_MDIO
+      Configure_Alternate_Function (PA7,  GPIO_AF_ETH_11); -- RMII_CRS_DV
+      Configure_Alternate_Function (PC1,  GPIO_AF_ETH_11); -- RMII_MDC
+      Configure_Alternate_Function (PC4,  GPIO_AF_ETH_11); -- RMII_RXD0
+      Configure_Alternate_Function (PC5,  GPIO_AF_ETH_11); -- RMII_RXD1
+      Configure_Alternate_Function (PG2,  GPIO_AF_ETH_11); -- RMII_RXER
+      Configure_Alternate_Function (PG11, GPIO_AF_ETH_11); -- RMII_TX_EN
+      Configure_Alternate_Function (PG13, GPIO_AF_ETH_11); -- RMII_TXD0
+      Configure_Alternate_Function (PG14, GPIO_AF_ETH_11); -- RMII_TXD1
       Configure_IO (PA1, (Mode_AF, Push_Pull, Speed_100MHz, Floating));
       Configure_IO (PA2, (Mode_AF, Push_Pull, Speed_100MHz, Floating));
       Configure_IO (PA7, (Mode_AF, Push_Pull, Speed_100MHz, Floating));
@@ -117,7 +117,7 @@ package body STM32.Eth is
    -- Read_MMI --
    --------------
 
-   procedure Read_MMI (Reg : UInt5; Val : out Unsigned_16)
+   procedure Read_MMI (Reg : UInt5; Val : out UInt16)
    is
       use Ada.Real_Time;
       Pa : constant UInt5 := 0;
@@ -154,7 +154,7 @@ package body STM32.Eth is
    procedure Init_Rx_Desc (I : Rx_Desc_Range)
    is
       function W is new Ada.Unchecked_Conversion
-        (Address, Word);
+        (Address, UInt32);
       Last : constant Boolean := I = Rx_Desc_Range'Last;
    begin
       Rx_Descs (I) :=
@@ -173,7 +173,7 @@ package body STM32.Eth is
       function To_Rx_Buffer_Arr_Ptr is new Ada.Unchecked_Conversion
         (System.Address, Rx_Buffer_Arr_Ptr);
       function W is new Ada.Unchecked_Conversion
-        (Address, Word);
+        (Address, UInt32);
       Desc_Addr : Address;
    begin
       --  FIXME: check speed, full duplex

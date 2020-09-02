@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------------
 --                                                                          --
---                    Copyright (C) 2015, AdaCore                           --
+--                   Copyright (C) 2015-2020 AdaCore                        --
 --                                                                          --
 --  Redistribution and use in source and binary forms, with or without      --
 --  modification, are permitted provided that the following conditions are  --
@@ -40,6 +40,8 @@
 --                                                                          --
 --   COPYRIGHT(c) 2014 STMicroelectronics                                   --
 ------------------------------------------------------------------------------
+
+with HAL.SPI;
 
 package body STM32.Board is
 
@@ -110,16 +112,16 @@ package body STM32.Board is
    ---------------------
 
    procedure Initialize_LEDs is
-      Configuration : GPIO_Port_Configuration;
    begin
       Enable_Clock (All_LEDs);
 
-      Configuration.Mode        := Mode_Out;
-      Configuration.Output_Type := Push_Pull;
-      Configuration.Speed       := Speed_100MHz;
-      Configuration.Resistors   := Floating;
-      Configure_IO (All_LEDs,
-                    Config => Configuration);
+      Configure_IO
+        (All_LEDs,
+         (Mode        => Mode_Out,
+          Output_Type => Push_Pull,
+          Speed       => Speed_100MHz,
+          Resistors   => Floating));
+
       All_LEDs_Off;
    end Initialize_LEDs;
 
@@ -144,17 +146,17 @@ package body STM32.Board is
       Enable_Clock (Port);
       Reset (Port);
 
-      Configure_Alternate_Function (Points, GPIO_AF_4_I2C2);
       Configure_IO (Points,
-                    (Speed       => Speed_25MHz,
-                     Mode        => Mode_AF,
-                     Output_Type => Open_Drain,
-                     Resistors   => Floating));
+                    (AF_Speed       => Speed_25MHz,
+                     Mode           => Mode_AF,
+                     AF             => GPIO_AF_I2C2_4,
+                     AF_Output_Type => Open_Drain,
+                     Resistors      => Floating));
       Lock (Points);
    end Initialize_I2C_GPIO;
 
    -------------------
-   -- TP_I2C_Config --
+   -- Configure_I2C --
    -------------------
 
    procedure Configure_I2C (Port : in out I2C_Port)
@@ -172,5 +174,60 @@ package body STM32.Board is
                others          => <>));
       end if;
    end Configure_I2C;
+
+   ------------------------
+   -- Initialize_EXT_SPI --
+   ------------------------
+
+   procedure Initialize_EXT_SPI
+   is
+      EXT_SPI_Points : constant STM32.GPIO.GPIO_Points := (EXT_MISO,
+                                                           EXT_MOSI,
+                                                           EXT_SCK);
+
+   begin
+      STM32.Device.Enable_Clock (EXT_SPI_Points);
+      STM32.GPIO.Configure_IO -- values copied from openmv.adb
+        (EXT_SPI_Points,
+         (Mode           => STM32.GPIO.Mode_AF,
+          AF             => STM32.Device.GPIO_AF_SPI1_5,
+          Resistors      => STM32.GPIO.Pull_Down,  --  SPI low polarity?
+          AF_Speed       => STM32.GPIO.Speed_50MHz,
+          AF_Output_Type => STM32.GPIO.Push_Pull));
+
+      STM32.Device.Enable_Clock (EXT_SPI);
+      EXT_SPI.Disable;
+      EXT_SPI.Configure
+        ((Direction           => STM32.SPI.D2Lines_FullDuplex,
+          Mode                => STM32.SPI.Master,
+          Data_Size           => HAL.SPI.Data_Size_8b,
+          --  These two if SPI Mode 3
+          --  Clock_Polarity => STM32.SPI.High,
+          --  Clock_Phase => STM32.SPI.P2Edge,
+          --  These two if not SPI Mode 3
+          Clock_Polarity      => STM32.SPI.Low,
+          Clock_Phase         => STM32.SPI.P1Edge,
+          Slave_Management    => STM32.SPI.Software_Managed,
+          Baud_Rate_Prescaler => STM32.SPI.BRP_64,
+          First_Bit           => STM32.SPI.MSB,
+          CRC_Poly            => 0));
+      EXT_SPI.Enable;
+   end Initialize_EXT_SPI;
+
+   ----------------------
+   -- Configure_EXT_CS --
+   ----------------------
+
+   procedure Configure_EXT_CS (Pin : in out STM32.GPIO.GPIO_Point)
+   is
+   begin
+      STM32.Device.Enable_Clock (Pin);
+      STM32.GPIO.Configure_IO
+        (Pin,
+         (Mode        => STM32.GPIO.Mode_Out,
+          Resistors   => STM32.GPIO.Floating,
+          Output_Type => STM32.GPIO.Push_Pull,
+          Speed       => STM32.GPIO.Speed_50MHz));
+   end Configure_EXT_CS;
 
 end STM32.Board;
